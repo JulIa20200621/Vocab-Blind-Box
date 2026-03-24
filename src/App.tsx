@@ -45,8 +45,6 @@ export default function App() {
   const [history, setHistory] = useState<string[]>([]); // Used for no-repeat logic
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
   const [bgColor, setBgColor] = useState('#FFFFFF');
-  const [detailedInfo, setDetailedInfo] = useState<WordDetail | null>(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   // Initialize data
   useEffect(() => {
@@ -114,36 +112,9 @@ export default function App() {
     pickRandomWord();
   };
 
-  const fetchDetailedDefinition = async (word: Word) => {
-    setIsLoadingDetail(true);
+  const fetchDetailedDefinition = (word: Word) => {
+    // No longer using AI, just navigating to the detail view which will show links
     setView('detail');
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `请详细解释英文单词 "${word.word}"。请严格按照以下 JSON 格式返回，不要包含任何 Markdown 符号或额外文字：
-        {
-          "definition": "详细的中文释义",
-          "etymology": "词源故事或构词法",
-          "collocations": ["搭配1", "搭配2", "搭配3"],
-          "examples": [
-            {"en": "English sentence", "zh": "中文翻译"},
-            {"en": "English sentence", "zh": "中文翻译"}
-          ]
-        }`,
-        config: {
-          responseMimeType: "application/json"
-        }
-      });
-      
-      const data = JSON.parse(response.text || '{}');
-      setDetailedInfo(data);
-    } catch (error) {
-      console.error(error);
-      setDetailedInfo(null);
-    } finally {
-      setIsLoadingDetail(false);
-    }
   };
 
   // --- Shake Detection ---
@@ -407,10 +378,10 @@ export default function App() {
 
               <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100">
                 <h4 className="text-blue-800 font-bold mb-2 flex items-center gap-2">
-                  💡 为什么换了？
+                  🚀 为什么要查词典？
                 </h4>
                 <p className="text-blue-700 text-sm leading-relaxed">
-                  为了让你在没有 VPN 的情况下也能流畅使用，我们现在直接连接到最权威的在线词典。这比 AI 生成的释义更准确，且完全不消耗流量费。
+                  通过权威词典，你可以看到更地道的例句、词源故事以及同义词辨析。这能帮你更全面地掌握单词用法，而不仅仅是记住一个中文意思。
                 </p>
               </div>
             </div>

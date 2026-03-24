@@ -28,9 +28,33 @@
 由于本项目已移除了对 Google Gemini AI 的依赖，现在你可以非常轻松地将其部署到任何地方，且**无需 VPN** 即可正常使用。
 
 ### 方案 A：部署到 Vercel (推荐)
-1. **导出代码**：在 AI Studio 中点击 `Settings` -> `Export to GitHub`。
-2. **连接 Vercel**：登录 [Vercel.com](https://vercel.com)，导入你的 GitHub 项目。
-3. **一键部署**：Vercel 会自动识别 Vite 配置并完成部署，给你一个专属链接。
+
+Vercel 是目前最流行的前端部署平台，操作非常简单。
+
+#### 1. 导出代码到 GitHub
+- 在 AI Studio 界面右上角点击 `Settings` (齿轮图标)。
+- 选择 `Export to GitHub`。
+- 按照提示授权并创建一个新的 GitHub 仓库（Repository）。
+
+#### 2. 登录 Vercel 并导入项目
+- 访问 [Vercel.com](https://vercel.com) 并使用你的 GitHub 账号登录。
+- 点击页面上的 **"Add New"** 按钮，选择 **"Project"**。
+- 你会看到一个列表，显示你 GitHub 账号下的所有仓库。找到你刚才导出的那个仓库，点击 **"Import"**。
+
+#### 3. 关于 "Git Scope" (科普)
+- **什么是 Git Scope？** 当 Vercel 询问你 Git Scope 时，它其实是在问：“你想把这个项目部署在哪个账号下？”
+- **如何操作？** 
+    - 如果你是个人用户，直接选择你的 **GitHub 用户名** 即可。
+    - 如果你属于某个组织（Organization），你也可以选择部署到组织账号下。
+    - **简单来说：看到你的头像和名字，点下去就对了。**
+
+#### 4. 配置与部署
+- Vercel 会自动识别这是一个 **Vite** 项目。
+- **Framework Preset** 应该自动显示为 `Vite`。
+- **Build Command** 应该是 `npm run build`。
+- **Output Directory** 应该是 `dist`。
+- 点击底部的 **"Deploy"** 按钮。
+- 等待大约 1 分钟，你的 APP 就正式上线了！你会得到一个以 `.vercel.app` 结尾的专属链接。
 
 ### 方案 B：手机端“安装”
 1. 在手机浏览器中打开你的部署链接。

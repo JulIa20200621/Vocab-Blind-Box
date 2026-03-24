@@ -1,4 +1,4 @@
-import { WordBank } from './types';
+import { WordBank } from '../types';
 
 export const DEFAULT_BANKS: WordBank[] = [
   {

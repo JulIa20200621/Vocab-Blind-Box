@@ -1,0 +1,20 @@
+{
+  "short_name": "单词盲盒",
+  "name": "单词盲盒 - 趣味背单词",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/app-icon/192/192",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://picsum.photos/seed/app-icon/512/512",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#FF1493",
+  "background_color": "#ffffff"
+}
