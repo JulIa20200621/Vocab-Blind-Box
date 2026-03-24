@@ -368,7 +368,7 @@ export default function App() {
                   <p className="text-sm text-neutral-400">选择你信任的词典查看详细解析：</p>
                   
                   <a 
-                    href={`https://m.youdao.com/dict?le=eng&q=${currentWord?.word}`}
+                    href={`https://dict.youdao.com/w/eng/${encodeURIComponent(currentWord?.word || '')}#keyfrom=dict2.index`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-between p-4 bg-[#FF1493]/5 border border-[#FF1493]/20 rounded-2xl text-[#FF1493] font-bold hover:bg-[#FF1493]/10 transition-colors"
@@ -380,7 +380,7 @@ export default function App() {
                   </a>
 
                   <a 
-                    href={`https://dictionary.cambridge.org/zhs/词典/英语-汉语-简体/${currentWord?.word}`}
+                    href={`https://dictionary.cambridge.org/zhs/搜索/英语-汉语-简体/?q=${encodeURIComponent(currentWord?.word || '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-between p-4 bg-blue-50 border border-blue-100 rounded-2xl text-blue-600 font-bold hover:bg-blue-100 transition-colors"
@@ -392,7 +392,7 @@ export default function App() {
                   </a>
 
                   <a 
-                    href={`https://www.bing.com/dict/search?q=${currentWord?.word}`}
+                    href={`https://www.bing.com/dict/search?q=${encodeURIComponent(currentWord?.word || '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-between p-4 bg-neutral-100 border border-neutral-200 rounded-2xl text-neutral-600 font-bold hover:bg-neutral-200 transition-colors"
