@@ -1,20 +1,64 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 📦 单词盲盒 (Word Blind Box)
 
-# Run and deploy your AI Studio app
+这是一个基于 React 开发的趣味背单词应用。通过“摇一摇”或点击开启盲盒的方式，随机抽取单词进行学习。
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/05050c56-aefe-44a9-b6fe-df19267a2cb6
+## 🌟 核心功能
 
-## Run Locally
+- **随机抽取**：点击“START”或**摇晃手机**，随机从词库中抽取一个单词。
+- **词典直达**：点击“查看详细释义”，直接跳转至**有道词典**、**剑桥词典**或**必应词典**的对应单词解析页面。
+- **自定义词库**：支持导入自己的单词列表。
+- **防重复模式**：开启后，已抽到的单词在词库抽完前不会再次出现。
+- **语音朗读**：自动朗读单词及其释义。
 
-**Prerequisites:**  Node.js
+---
 
+## 🛠️ 技术架构 (科普)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **前端框架**：[React](https://react.dev/) - 用于构建用户界面的现代 JavaScript 库。
+- **构建工具**：[Vite](https://vitejs.dev/) - 极速的前端构建工具，让开发和加载更流畅。
+- **样式方案**：[Tailwind CSS](https://tailwindcss.com/) - 实用优先的 CSS 框架，确保 APP 在各种手机屏幕上都能完美适配。
+- **动画效果**：[Motion](https://motion.dev/) - 提供丝滑的转场和交互动画。
+
+---
+
+## 🚀 部署指南 (如何让别人也能用)
+
+由于本项目已移除了对 Google Gemini AI 的依赖，现在你可以非常轻松地将其部署到任何地方，且**无需 VPN** 即可正常使用。
+
+### 方案 A：部署到 Vercel (推荐)
+1. **导出代码**：在 AI Studio 中点击 `Settings` -> `Export to GitHub`。
+2. **连接 Vercel**：登录 [Vercel.com](https://vercel.com)，导入你的 GitHub 项目。
+3. **一键部署**：Vercel 会自动识别 Vite 配置并完成部署，给你一个专属链接。
+
+### 方案 B：手机端“安装”
+1. 在手机浏览器中打开你的部署链接。
+2. **iOS (Safari)**：点击“分享”按钮 -> “添加到主屏幕”。
+3. **Android (Chrome)**：点击菜单 -> “添加到主屏幕”或“安装应用”。
+*这样它就会像原生 APP 一样出现在你的手机桌面上。*
+
+---
+
+## 💡 常见问题解答 (FAQ)
+
+### 1. 为什么不再使用 Gemini AI？
+原版应用使用 Gemini AI 生成释义，但这需要：
+- **API Key**：配置麻烦。
+- **VPN (科学上网)**：在国内访问不稳定，经常报 404。
+- **准确性**：AI 有时会生成错误的例句。
+
+**现在的方案**：直接跳转至权威词典（如有道、剑桥）。这不仅**完全免费**、**无需 VPN**，而且数据**100% 准确**。
+
+### 2. 为什么我打开是 404？
+- 如果你使用的是 Google AI Studio 的预览链接，由于服务器在美国，国内网络可能无法直接访问。
+- **解决方法**：按照上面的“部署指南”，将其部署到 Vercel 或国内服务器。
+
+### 3. “摇一摇”没反应？
+- 手机浏览器出于隐私保护，通常需要用户手动授权“动作感应”权限。
+- 请在手机上打开 APP 时，点击页面上的任何地方，并确保在浏览器弹窗中点击了“允许访问动作感应”。
+
+---
+
+## 📄 开源协议
+本项目采用 Apache-2.0 协议。
