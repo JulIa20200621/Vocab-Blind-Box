@@ -1,0 +1,5 @@
+{
+  "name": "单词盲盒 (Word Blind Box)",
+  "description": "一个充满惊喜的单词记忆APP，通过摇一摇开启你的单词盲盒。",
+  "requestFramePermissions": ["microphone"]
+}
