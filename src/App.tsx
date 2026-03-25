@@ -17,7 +17,7 @@ import {
   Trash2,
   ExternalLink
 } from 'lucide-react';
-import { Word, WordBank, AppSettings } from './types';
+import { Word, WordBank, AppSettings, DailyProgress, UserProfile } from './types';
 import { DEFAULT_BANKS } from './data/defaultWords';
 
 import { GoogleGenAI, Type } from "@google/genai";
@@ -30,6 +30,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 const STORAGE_KEY_BANKS = 'word_blind_box_custom_banks';
 const STORAGE_KEY_SETTINGS = 'word_blind_box_settings';
 const STORAGE_KEY_HISTORY = 'word_blind_box_history';
+const STORAGE_KEY_PROGRESS = 'word_blind_box_progress';
+const STORAGE_KEY_USER = 'word_blind_box_user';
 
 const COLORS = [
   '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', 
@@ -45,12 +47,103 @@ const COLOR_THEMES = {
 
 const NEUTRAL_COLORS = ['#000000', '#333333', '#666666', '#999999'];
 
+const WORD_FIXED_PALETTE = [
+  { high: '#000000', low: '#666666', name: '黑灰' },
+  { high: '#999999', low: '#CCCCCC', name: '浅灰' },
+  { high: '#E63946', low: '#FAD2E1', name: '红' },
+  { high: '#007AFF', low: '#BDE0FE', name: '蓝' },
+  { high: '#34C759', low: '#D8F3DC', name: '绿' },
+  { high: '#FFD60A', low: '#FFF3B0', name: '黄' },
+  { high: '#AF52DE', low: '#E0BBE4', name: '紫' },
+  { high: '#FF9500', low: '#FFD8A8', name: '橙' },
+];
+
+const BG_FIXED_PALETTE = [
+  { color: '#FFFFFF', name: '纯白' },
+  { color: '#FDFCF8', name: '米白' },
+  { color: '#F5F5F5', name: '浅灰' },
+  { color: '#FFF0F5', name: '淡粉' },
+  { color: '#F0F8FF', name: '淡蓝' },
+  { color: '#F5F5DC', name: '米黄' },
+  { color: '#1A1A1B', name: '深黑' },
+  { color: '#2C3E50', name: '深蓝' },
+  { color: '#34495E', name: '灰蓝' },
+  { color: '#121212', name: '极黑' },
+  { color: '#1E1E1E', name: '炭黑' },
+  { color: '#212121', name: '哑黑' },
+];
+
+const MOODS = [
+  { emoji: '😊', label: '开心', color: '#FFD700' },
+  { emoji: '😎', label: '自信', color: '#4CAF50' },
+  { emoji: '🤔', label: '思考', color: '#2196F3' },
+  { emoji: '😴', label: '困倦', color: '#9C27B0' },
+  { emoji: '😫', label: '疲惫', color: '#FF5722' },
+  { emoji: '😤', label: '奋斗', color: '#F44336' },
+];
+
 const getRandomColor = (palette: string[]) => palette[Math.floor(Math.random() * palette.length)];
 
 // --- Components ---
 
+const Calendar = ({ progress, onDayClick }: { progress: DailyProgress[], onDayClick: (day: DailyProgress) => void }) => {
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+  
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+    return progress.find(p => p.date === dateStr) || { date: dateStr, wordCount: 0, timeSpent: 0 };
+  });
+
+  return (
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-100">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-lg">{now.getFullYear()}年{now.getMonth() + 1}月</h3>
+        <div className="flex gap-2">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm bg-neutral-100 border border-neutral-900"></div>
+            <span className="text-[10px] text-neutral-400">未打卡</span>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-2">
+        {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+          <div key={d} className="text-center text-[10px] font-bold text-neutral-300 py-1">{d}</div>
+        ))}
+        {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
+        {days.map(day => {
+          const hasData = day.wordCount > 0;
+          return (
+            <button
+              key={day.date}
+              onClick={() => onDayClick(day as DailyProgress)}
+              className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative ${
+                hasData 
+                  ? 'ring-2 ring-offset-1 ring-neutral-100' 
+                  : 'bg-neutral-50 border border-neutral-900/10'
+              }`}
+              style={{ backgroundColor: (day as DailyProgress).moodColor || 'transparent' }}
+            >
+              <span className={`text-[10px] font-bold ${hasData ? 'text-white drop-shadow-sm' : 'text-neutral-300'}`}>
+                {parseInt(day.date.split('-')[2])}
+              </span>
+              {hasData && (day as DailyProgress).mood && (
+                <span className="text-xs">{(day as DailyProgress).mood}</span>
+              )}
+              {!hasData && (
+                <div className="absolute inset-0 border-2 border-black rounded-xl opacity-5 pointer-events-none"></div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
-  const [view, setView] = useState<'home' | 'blind-box' | 'settings' | 'detail'>('home');
+  const [view, setView] = useState<'home' | 'blind-box' | 'settings' | 'detail' | 'mood-prompt' | 'completion'>('home');
   const [customBanks, setCustomBanks] = useState<WordBank[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
     currentBankId: 'gaokao',
@@ -58,15 +151,28 @@ export default function App() {
     displayDuration: 3,
     volume: 1,
     brightness: 100,
-    wordColorMode: 'auto',
+    wordColorMode: 'fixed',
     wordFixedColor: '#000000',
-    bgColorMode: 'auto',
+    wordCustomColors: [],
+    bgColorMode: 'dopamine',
     bgFixedColor: '#FFFFFF',
     bgTheme: 'warm',
+    bgCustomColors: [],
+    dailyGoal: 'mood',
   });
   const [history, setHistory] = useState<string[]>([]); // Used for no-repeat logic
+  const [progress, setProgress] = useState<DailyProgress[]>([]);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
   const [bgColor, setBgColor] = useState('#FFFFFF');
+  const [wordColor, setWordColor] = useState('#000000');
+  
+  // Session tracking
+  const [sessionStartTime, setSessionStartTime] = useState<number>(0);
+  const [sessionWordCount, setSessionWordCount] = useState<number>(0);
+  const [selectedDay, setSelectedDay] = useState<DailyProgress | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   // Initialize data
   useEffect(() => {
@@ -74,10 +180,19 @@ export default function App() {
     if (savedBanks) setCustomBanks(JSON.parse(savedBanks));
 
     const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
-    if (savedSettings) setSettings(JSON.parse(savedSettings));
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings);
+      setSettings(prev => ({ ...prev, ...parsed }));
+    }
 
     const savedHistory = localStorage.getItem(STORAGE_KEY_HISTORY);
     if (savedHistory) setHistory(JSON.parse(savedHistory));
+
+    const savedProgress = localStorage.getItem(STORAGE_KEY_PROGRESS);
+    if (savedProgress) setProgress(JSON.parse(savedProgress));
+
+    const savedUser = localStorage.getItem(STORAGE_KEY_USER);
+    if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
 
   // Save data
@@ -93,44 +208,88 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history));
   }, [history]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PROGRESS, JSON.stringify(progress));
+  }, [progress]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+  }, [user]);
+
   const allBanks = [...DEFAULT_BANKS, ...customBanks];
   const currentBank = allBanks.find(b => b.id === settings.currentBankId) || DEFAULT_BANKS[0];
 
   const speak = (text: string) => {
-    // Cancel any ongoing speech to prevent mismatch when switching fast
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.volume = settings.volume;
-    window.speechSynthesis.speak(utterance);
+    try {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      // Ensure volume is a valid number between 0 and 1
+      const vol = typeof settings.volume === 'number' ? settings.volume : 1;
+      utterance.volume = Math.max(0, Math.min(1, vol));
+      
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error('Speech synthesis error:', e);
+    }
   };
 
   const pickRandomWord = useCallback(() => {
     let availableWords = currentBank.words;
     
+    // Check if all words in bank are finished
+    if (settings.noRepeat && history.length >= currentBank.words.length) {
+      setView('completion');
+      return;
+    }
+
     if (settings.noRepeat && history.length < currentBank.words.length) {
       availableWords = currentBank.words.filter(w => !history.includes(w.word));
     }
 
     if (availableWords.length === 0) {
       if (settings.noRepeat) {
-        setHistory([]); // Reset history if all words used
-        availableWords = currentBank.words;
+        setView('completion');
+        return;
       } else {
-        return; // Should not happen
+        availableWords = currentBank.words;
       }
+    }
+
+    // Check daily goal
+    if (settings.dailyGoal !== 'mood' && sessionWordCount >= (settings.dailyGoal as number)) {
+      handleEndSession();
+      return;
     }
 
     const word = availableWords[Math.floor(Math.random() * availableWords.length)];
     setCurrentWord(word);
+    setSessionWordCount(prev => prev + 1);
     
+    // Set Word Color
+    if (settings.wordColorMode === 'fixed') {
+      setWordColor(settings.wordFixedColor);
+    } else if (settings.wordColorMode === 'neutral') {
+      setWordColor(getRandomColor(NEUTRAL_COLORS));
+    } else if (settings.wordColorMode === 'custom' && settings.wordCustomColors.length > 0) {
+      setWordColor(getRandomColor(settings.wordCustomColors));
+    } else {
+      setWordColor(getRandomColor(COLORS));
+    }
+
     // Set Background Color
-    if (settings.bgColorMode === 'auto') {
+    if (settings.bgColorMode === 'dopamine') {
       setBgColor(getRandomColor(COLORS));
     } else if (settings.bgColorMode === 'fixed') {
       setBgColor(settings.bgFixedColor);
     } else if (settings.bgColorMode === 'theme') {
       setBgColor(getRandomColor(COLOR_THEMES[settings.bgTheme]));
+    } else if (settings.bgColorMode === 'custom' && settings.bgCustomColors.length > 0) {
+      setBgColor(getRandomColor(settings.bgCustomColors));
+    } else {
+      setBgColor('#FFFFFF');
     }
 
     if (settings.noRepeat) {
@@ -142,8 +301,44 @@ export default function App() {
   }, [currentBank, settings, history]);
 
   const handleStart = () => {
+    setSessionStartTime(Date.now());
+    setSessionWordCount(0);
     setView('blind-box');
     pickRandomWord();
+  };
+
+  const handleEndSession = () => {
+    setView('mood-prompt');
+  };
+
+  const saveSession = (mood?: { emoji: string, label: string, color: string }, note?: string) => {
+    const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+    const today = new Date().toISOString().split('T')[0];
+    
+    setProgress(prev => {
+      const existing = prev.find(p => p.date === today);
+      if (existing) {
+        return prev.map(p => p.date === today ? {
+          ...p,
+          wordCount: p.wordCount + sessionWordCount,
+          timeSpent: p.timeSpent + duration,
+          mood: mood?.emoji || p.mood,
+          moodColor: mood?.color || p.moodColor,
+          note: note || p.note
+        } : p);
+      }
+      return [...prev, {
+        date: today,
+        wordCount: sessionWordCount,
+        timeSpent: duration,
+        mood: mood?.emoji,
+        moodColor: mood?.color,
+        note
+      }];
+    });
+    
+    setView('home');
+    setShowExitConfirm(false);
   };
 
   const fetchDetailedDefinition = (word: Word) => {
@@ -200,10 +395,13 @@ export default function App() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col p-6"
+            className="flex-1 flex flex-col p-6 overflow-y-auto"
           >
             <div className="flex justify-between items-center mb-8">
-              <h1 className="text-2xl font-bold tracking-tight">单词盲盒</h1>
+              <div className="flex flex-col">
+                <h1 className="text-2xl font-bold tracking-tight">单词盲盒</h1>
+                <p className="text-[10px] text-neutral-400 font-medium">让每个人都能爱上背单词 ✨</p>
+              </div>
               <button onClick={() => setView('settings')} className="p-2 rounded-full hover:bg-neutral-200 transition-colors">
                 <SettingsIcon size={24} />
               </button>
@@ -211,13 +409,13 @@ export default function App() {
 
             <button 
               onClick={handleStart}
-              className="w-full aspect-square rounded-3xl bg-[#FF1493] text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform mb-8"
+              className="w-full aspect-square rounded-3xl bg-[#FF1493] text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform mb-8 shrink-0"
             >
               <span className="text-4xl font-black mb-2">START</span>
               <span className="text-sm opacity-80">开启今日盲盒</span>
             </button>
 
-            <div className="space-y-4">
+            <div className="space-y-6 mb-8">
               <div className="p-4 bg-white rounded-2xl border border-neutral-200 shadow-sm">
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2 block">当前词库</label>
                 <div className="flex items-center justify-between">
@@ -242,6 +440,51 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            <Calendar 
+              progress={progress} 
+              onDayClick={(day) => {
+                if (day.wordCount > 0) setSelectedDay(day);
+              }} 
+            />
+
+            {selectedDay && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+                onClick={() => setSelectedDay(null)}
+              >
+                <motion.div 
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  className="bg-white w-full max-w-xs rounded-[32px] p-8 space-y-6 relative"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <button onClick={() => setSelectedDay(null)} className="absolute top-6 right-6 text-neutral-400"><X size={20} /></button>
+                  <div className="text-center">
+                    <div className="text-4xl mb-2">{selectedDay.mood}</div>
+                    <h3 className="text-xl font-bold">{selectedDay.date}</h3>
+                    <p className="text-sm text-neutral-400">学习报告</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-neutral-50 p-4 rounded-2xl text-center">
+                      <div className="text-2xl font-black text-[#FF1493]">{selectedDay.wordCount}</div>
+                      <div className="text-[10px] text-neutral-400">单词数</div>
+                    </div>
+                    <div className="bg-neutral-50 p-4 rounded-2xl text-center">
+                      <div className="text-2xl font-black text-[#FF1493]">{Math.floor(selectedDay.timeSpent / 60)}m</div>
+                      <div className="text-[10px] text-neutral-400">时长</div>
+                    </div>
+                  </div>
+                  {selectedDay.note && (
+                    <div className="bg-neutral-50 p-4 rounded-2xl italic text-sm text-neutral-600">
+                      "{selectedDay.note}"
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
           </motion.div>
         )}
 
@@ -260,13 +503,7 @@ export default function App() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 className="text-5xl font-bold tracking-tight"
-                style={{ 
-                  color: settings.wordColorMode === 'fixed' 
-                    ? settings.wordFixedColor 
-                    : settings.wordColorMode === 'neutral'
-                    ? getRandomColor(NEUTRAL_COLORS)
-                    : undefined 
-                }}
+                style={{ color: wordColor }}
               >
                 {currentWord.word}
               </motion.h2>
@@ -282,7 +519,13 @@ export default function App() {
               </motion.div>
             </div>
 
-            <div className="absolute top-8 right-8">
+            <div className="absolute top-8 right-8 flex gap-2">
+              <button 
+                onClick={() => speak(`${currentWord.word}. ${currentWord.pos}. ${currentWord.meaning}`)} 
+                className="p-3 bg-white/20 backdrop-blur-md rounded-full text-neutral-900"
+              >
+                <Volume2 size={24} />
+              </button>
               <button onClick={pickRandomWord} className="p-3 bg-white/20 backdrop-blur-md rounded-full text-neutral-900">
                 <RefreshCw size={24} />
               </button>
@@ -297,8 +540,126 @@ export default function App() {
               duration={settings.displayDuration} 
               word={currentWord}
               onDetail={() => fetchDetailedDefinition(currentWord)}
-              onHome={() => setView('home')}
+              onHome={() => setShowExitConfirm(true)}
             />
+
+            {showExitConfirm && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+              >
+                <motion.div 
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  className="bg-white w-full max-w-xs rounded-[32px] p-8 space-y-6"
+                >
+                  <div className="text-center">
+                    <h3 className="text-xl font-bold mb-2">结束盲盒时间？</h3>
+                    <p className="text-sm text-neutral-400">记录下你现在的心情吧 ✨</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setShowExitConfirm(false)}
+                      className="flex-1 py-4 bg-neutral-100 rounded-2xl font-bold"
+                    >
+                      继续背
+                    </button>
+                    <button 
+                      onClick={handleEndSession}
+                      className="flex-1 py-4 bg-[#FF1493] text-white rounded-2xl font-bold"
+                    >
+                      结束
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
+        {view === 'mood-prompt' && (
+          <motion.div 
+            key="mood-prompt"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex-1 flex flex-col p-8 bg-white"
+          >
+            <div className="flex-1 flex flex-col justify-center space-y-8">
+              <div className="text-center">
+                <h2 className="text-3xl font-black mb-2">今天心情如何？</h2>
+                <p className="text-neutral-400">选一个代表你现在的状态</p>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                {MOODS.map(m => (
+                  <button
+                    key={m.label}
+                    onClick={() => saveSession(m)}
+                    className="aspect-square rounded-3xl bg-neutral-50 flex flex-col items-center justify-center gap-2 hover:bg-neutral-100 transition-colors active:scale-95"
+                  >
+                    <span className="text-3xl">{m.emoji}</span>
+                    <span className="text-[10px] font-bold text-neutral-400">{m.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-neutral-400 uppercase tracking-widest">写点什么 (可选)</label>
+                <textarea 
+                  placeholder="记录下此刻的想法..."
+                  className="w-full p-4 bg-neutral-50 rounded-2xl border-none focus:ring-2 focus:ring-[#FF1493]/20 h-24 resize-none"
+                  onBlur={(e) => {
+                    // We'll save this when they pick a mood
+                  }}
+                  id="session-note"
+                />
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => {
+                const note = (document.getElementById('session-note') as HTMLTextAreaElement)?.value;
+                saveSession(undefined, note);
+              }}
+              className="w-full py-5 bg-neutral-900 text-white rounded-2xl font-bold shadow-xl"
+            >
+              直接跳过
+            </button>
+          </motion.div>
+        )}
+
+        {view === 'completion' && (
+          <motion.div 
+            key="completion"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex-1 flex flex-col items-center justify-center p-8 bg-[#FF1493] text-white text-center"
+          >
+            <motion.div
+              initial={{ scale: 0.5, rotate: -10 }}
+              animate={{ scale: 1, rotate: 0 }}
+              className="text-8xl mb-8"
+            >
+              🏆
+            </motion.div>
+            <h2 className="text-3xl font-black mb-4">恭喜你！</h2>
+            <p className="text-lg opacity-90 mb-8">
+              你已经成功学完了 <span className="font-black underline">{currentBank.name}</span> 的所有词汇！
+            </p>
+            <div className="bg-white/20 backdrop-blur-md p-6 rounded-3xl mb-8 w-full">
+              <div className="text-sm opacity-80 mb-1">总计背诵</div>
+              <div className="text-4xl font-black">{currentBank.words.length} 词</div>
+            </div>
+            <button 
+              onClick={() => {
+                setHistory([]);
+                setView('home');
+              }}
+              className="w-full py-5 bg-white text-[#FF1493] rounded-2xl font-bold shadow-xl active:scale-95 transition-transform"
+            >
+              太棒了，回到首页
+            </button>
           </motion.div>
         )}
 
@@ -310,13 +671,60 @@ export default function App() {
             exit={{ x: '100%' }}
             className="flex-1 bg-white flex flex-col"
           >
-            <div className="p-6 border-bottom flex items-center gap-4">
+            <div className="p-6 border-b flex items-center gap-4">
               <button onClick={() => setView('home')} className="p-2 -ml-2"><ChevronLeft /></button>
               <h2 className="text-xl font-bold">设置与词库</h2>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
+              {/* User Account Placeholder */}
+              <section className="bg-neutral-50 p-6 rounded-[32px] border border-neutral-100">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 bg-neutral-200 rounded-full flex items-center justify-center text-neutral-400">
+                    <HomeIcon size={32} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">{user?.name || '游客用户'}</h3>
+                    <p className="text-xs text-neutral-400">登录同步你的学习进度</p>
+                  </div>
+                </div>
+                <button className="w-full py-3 bg-neutral-900 text-white rounded-2xl font-bold text-sm opacity-50 cursor-not-allowed">
+                  账号管理 (即将上线)
+                </button>
+              </section>
+
               <section className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">每日盲盒目标</h3>
+                  <div className="flex gap-2 mb-4">
+                    {[
+                      { id: 10, label: '10个' },
+                      { id: 20, label: '20个' },
+                      { id: 50, label: '50个' },
+                      { id: 'mood', label: '看心情' }
+                    ].map(goal => (
+                      <button 
+                        key={goal.id}
+                        onClick={() => setSettings(s => ({ ...s, dailyGoal: goal.id as any }))}
+                        className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all ${settings.dailyGoal === goal.id ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
+                      >
+                        {goal.label}
+                      </button>
+                    ))}
+                  </div>
+                  {typeof settings.dailyGoal === 'number' && (
+                    <div className="space-y-2">
+                      <input 
+                        type="range" min="5" max="100" step="5"
+                        value={settings.dailyGoal as number}
+                        onChange={(e) => setSettings(s => ({ ...s, dailyGoal: parseInt(e.target.value) }))}
+                        className="w-full accent-[#FF1493]"
+                      />
+                      <div className="text-center text-xs font-mono text-neutral-400">自定义目标: {settings.dailyGoal}个</div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">显示时长 (秒)</h3>
                   <input 
@@ -356,16 +764,17 @@ export default function App() {
 
                 <div>
                   <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">单词显示颜色</h3>
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex gap-1 mb-4">
                     {[
-                      { id: 'auto', label: '随机多巴胺' },
-                      { id: 'neutral', label: '黑白灰' },
-                      { id: 'fixed', label: '固定色' }
+                      { id: 'dopamine', label: '随机多巴胺' },
+                      { id: 'neutral', label: '随机黑白灰' },
+                      { id: 'fixed', label: '固定色' },
+                      { id: 'custom', label: '自定义' }
                     ].map(mode => (
                       <button 
                         key={mode.id}
                         onClick={() => setSettings(s => ({ ...s, wordColorMode: mode.id as any }))}
-                        className={`flex-1 py-3 rounded-xl font-bold text-[10px] transition-all ${settings.wordColorMode === mode.id ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
+                        className={`flex-1 py-3 rounded-xl font-bold text-[9px] transition-all ${settings.wordColorMode === mode.id ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
                       >
                         {mode.label}
                       </button>
@@ -373,37 +782,66 @@ export default function App() {
                   </div>
                   
                   {settings.wordColorMode === 'fixed' && (
-                    <div className="flex justify-between px-2">
-                      {[
-                        { name: '黑', color: '#000000' },
-                        { name: '深灰', color: '#333333' },
-                        { name: '中灰', color: '#666666' },
-                        { name: '浅灰', color: '#999999' },
-                        { name: '粉', color: '#FF1493' }
-                      ].map(c => (
-                        <button
-                          key={c.color}
-                          onClick={() => setSettings(s => ({ ...s, wordFixedColor: c.color }))}
-                          className={`w-8 h-8 rounded-full border-4 transition-transform ${settings.wordFixedColor === c.color ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
-                          style={{ backgroundColor: c.color }}
-                        />
+                    <div className="space-y-2">
+                      {WORD_FIXED_PALETTE.map(p => (
+                        <div key={p.name} className="flex items-center gap-3">
+                          <span className="text-[10px] text-neutral-400 w-4">{p.name}</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setSettings(s => ({ ...s, wordFixedColor: p.high }))}
+                              className={`w-8 h-8 rounded-full border-2 transition-transform ${settings.wordFixedColor === p.high ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
+                              style={{ backgroundColor: p.high }}
+                            />
+                            <button
+                              onClick={() => setSettings(s => ({ ...s, wordFixedColor: p.low }))}
+                              className={`w-8 h-8 rounded-full border-2 transition-transform ${settings.wordFixedColor === p.low ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
+                              style={{ backgroundColor: p.low }}
+                            />
+                          </div>
+                        </div>
                       ))}
+                    </div>
+                  )}
+
+                  {settings.wordColorMode === 'custom' && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] text-neutral-400">最多选3个颜色 (已选: {settings.wordCustomColors.length}/3)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[...COLORS, ...NEUTRAL_COLORS].map(color => {
+                          const isSelected = settings.wordCustomColors.includes(color);
+                          return (
+                            <button
+                              key={color}
+                              onClick={() => {
+                                setSettings(s => {
+                                  if (isSelected) return { ...s, wordCustomColors: s.wordCustomColors.filter(c => c !== color) };
+                                  if (s.wordCustomColors.length >= 3) return s;
+                                  return { ...s, wordCustomColors: [...s.wordCustomColors, color] };
+                                });
+                              }}
+                              className={`w-8 h-8 rounded-full border-2 transition-all ${isSelected ? 'scale-110 border-neutral-900 ring-2 ring-neutral-900/10' : 'border-transparent opacity-60'}`}
+                              style={{ backgroundColor: color }}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
 
                 <div>
                   <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">背景显示模式</h3>
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex gap-1 mb-4">
                     {[
-                      { id: 'auto', label: '随机多巴胺' },
+                      { id: 'dopamine', label: '随机多巴胺' },
                       { id: 'theme', label: '特定色系' },
-                      { id: 'fixed', label: '固定纯色' }
+                      { id: 'fixed', label: '固定纯色' },
+                      { id: 'custom', label: '自定义' }
                     ].map(mode => (
                       <button 
                         key={mode.id}
                         onClick={() => setSettings(s => ({ ...s, bgColorMode: mode.id as any }))}
-                        className={`flex-1 py-3 rounded-xl font-bold text-[10px] transition-all ${settings.bgColorMode === mode.id ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
+                        className={`flex-1 py-3 rounded-xl font-bold text-[9px] transition-all ${settings.bgColorMode === mode.id ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
                       >
                         {mode.label}
                       </button>
@@ -431,21 +869,41 @@ export default function App() {
                   )}
                   
                   {settings.bgColorMode === 'fixed' && (
-                    <div className="flex justify-between px-2">
-                      {[
-                        { name: '白', color: '#FFFFFF' },
-                        { name: '米', color: '#FDFCF8' },
-                        { name: '灰', color: '#F5F5F5' },
-                        { name: '粉', color: '#FFF0F5' },
-                        { name: '蓝', color: '#F0F8FF' }
-                      ].map(c => (
+                    <div className="grid grid-cols-6 gap-2 px-1">
+                      {BG_FIXED_PALETTE.map(c => (
                         <button
                           key={c.color}
                           onClick={() => setSettings(s => ({ ...s, bgFixedColor: c.color }))}
-                          className={`w-8 h-8 rounded-full border-4 transition-transform ${settings.bgFixedColor === c.color ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
+                          className={`w-full aspect-square rounded-full border-2 transition-transform ${settings.bgFixedColor === c.color ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
                           style={{ backgroundColor: c.color }}
+                          title={c.name}
                         />
                       ))}
+                    </div>
+                  )}
+
+                  {settings.bgColorMode === 'custom' && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] text-neutral-400">最多选5个颜色 (已选: {settings.bgCustomColors.length}/5)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[...COLORS, ...BG_FIXED_PALETTE.map(p => p.color)].map(color => {
+                          const isSelected = settings.bgCustomColors.includes(color);
+                          return (
+                            <button
+                              key={color}
+                              onClick={() => {
+                                setSettings(s => {
+                                  if (isSelected) return { ...s, bgCustomColors: s.bgCustomColors.filter(c => c !== color) };
+                                  if (s.bgCustomColors.length >= 5) return s;
+                                  return { ...s, bgCustomColors: [...s.bgCustomColors, color] };
+                                });
+                              }}
+                              className={`w-8 h-8 rounded-full border-2 transition-all ${isSelected ? 'scale-110 border-neutral-900 ring-2 ring-neutral-900/10' : 'border-transparent opacity-60'}`}
+                              style={{ backgroundColor: color }}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -600,7 +1058,7 @@ function DelayedMenu({ duration, onDetail, onHome, word }: { duration: number, o
               onClick={onHome}
               className="w-full py-4 bg-white border border-neutral-200 rounded-2xl font-bold flex items-center justify-center gap-2"
             >
-              <HomeIcon size={20} /> 回到主页
+              <X size={20} /> 是否结束盲盒时间？
             </button>
           </div>
         </motion.div>
