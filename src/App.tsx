@@ -121,18 +121,18 @@ const Calendar = ({ progress, onDayClick }: { progress: DailyProgress[], onDayCl
               className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative ${
                 hasData 
                   ? 'ring-2 ring-offset-1 ring-neutral-100' 
-                  : 'bg-neutral-50 border border-neutral-900/10'
+                  : 'bg-neutral-100 border border-neutral-300'
               }`}
               style={{ backgroundColor: (day as DailyProgress).moodColor || 'transparent' }}
             >
-              <span className={`text-[10px] font-bold ${hasData ? 'text-white drop-shadow-sm' : 'text-neutral-300'}`}>
+              <span className={`text-[10px] font-bold ${hasData ? 'text-white drop-shadow-sm' : 'text-neutral-400'}`}>
                 {parseInt(day.date.split('-')[2])}
               </span>
               {hasData && (day as DailyProgress).mood && (
                 <span className="text-xs">{(day as DailyProgress).mood}</span>
               )}
               {!hasData && (
-                <div className="absolute inset-0 border-2 border-black rounded-xl opacity-5 pointer-events-none"></div>
+                <div className="absolute inset-0 border border-black/20 rounded-xl pointer-events-none"></div>
               )}
             </button>
           );
@@ -458,30 +458,74 @@ export default function App() {
                 <motion.div 
                   initial={{ scale: 0.9, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
-                  className="bg-white w-full max-w-xs rounded-[32px] p-8 space-y-6 relative"
+                  className="bg-white w-full max-w-sm rounded-[40px] p-10 space-y-8 relative overflow-hidden"
                   onClick={e => e.stopPropagation()}
                 >
-                  <button onClick={() => setSelectedDay(null)} className="absolute top-6 right-6 text-neutral-400"><X size={20} /></button>
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">{selectedDay.mood}</div>
-                    <h3 className="text-xl font-bold">{selectedDay.date}</h3>
-                    <p className="text-sm text-neutral-400">学习报告</p>
+                  {/* Background Decoration */}
+                  <div className="absolute top-0 left-0 w-full h-24 opacity-10" style={{ backgroundColor: selectedDay.moodColor || '#FF1493' }}></div>
+                  
+                  <button onClick={() => setSelectedDay(null)} className="absolute top-6 right-6 p-2 bg-neutral-100 rounded-full text-neutral-400 hover:text-neutral-900 transition-colors">
+                    <X size={20} />
+                  </button>
+
+                  <div className="text-center relative pt-4">
+                    <div className="text-6xl mb-4 drop-shadow-lg">{selectedDay.mood || '📝'}</div>
+                    <h3 className="text-2xl font-black tracking-tight">{selectedDay.date}</h3>
+                    <p className="text-sm font-bold text-neutral-400 uppercase tracking-widest mt-1">学习成就报告</p>
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-neutral-50 p-4 rounded-2xl text-center">
-                      <div className="text-2xl font-black text-[#FF1493]">{selectedDay.wordCount}</div>
-                      <div className="text-[10px] text-neutral-400">单词数</div>
+                    <div className="bg-neutral-50 p-6 rounded-[32px] text-center border border-neutral-100">
+                      <div className="text-3xl font-black text-[#FF1493] mb-1">{selectedDay.wordCount}</div>
+                      <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">已拆盲盒</div>
                     </div>
-                    <div className="bg-neutral-50 p-4 rounded-2xl text-center">
-                      <div className="text-2xl font-black text-[#FF1493]">{Math.floor(selectedDay.timeSpent / 60)}m</div>
-                      <div className="text-[10px] text-neutral-400">时长</div>
+                    <div className="bg-neutral-50 p-6 rounded-[32px] text-center border border-neutral-100">
+                      <div className="text-3xl font-black text-[#FF1493] mb-1">{Math.floor(selectedDay.timeSpent / 60)}<span className="text-sm">m</span></div>
+                      <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">专注时长</div>
                     </div>
                   </div>
-                  {selectedDay.note && (
-                    <div className="bg-neutral-50 p-4 rounded-2xl italic text-sm text-neutral-600">
-                      "{selectedDay.note}"
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-2">
+                      <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">平均效率</span>
+                      <span className="text-sm font-bold">约 {selectedDay.wordCount > 0 ? (selectedDay.timeSpent / selectedDay.wordCount).toFixed(1) : 0} 秒/词</span>
                     </div>
-                  )}
+                    
+                    <div className="p-6 bg-neutral-50 rounded-[32px] border border-neutral-100 relative">
+                      <label className="absolute -top-2 left-6 px-2 bg-white text-[10px] font-bold text-neutral-400 uppercase tracking-widest">今日感悟</label>
+                      {selectedDay.date === new Date().toISOString().split('T')[0] ? (
+                        <div className="space-y-3">
+                          <textarea 
+                            defaultValue={selectedDay.note}
+                            id="edit-note"
+                            className="w-full bg-transparent border-none focus:ring-0 text-sm text-neutral-700 leading-relaxed italic resize-none p-0 h-20"
+                            placeholder="点击这里修改你的感悟..."
+                          />
+                          <button 
+                            onClick={() => {
+                              const newNote = (document.getElementById('edit-note') as HTMLTextAreaElement)?.value;
+                              setProgress(prev => prev.map(p => p.date === selectedDay.date ? { ...p, note: newNote } : p));
+                              setSelectedDay(prev => prev ? { ...prev, note: newNote } : null);
+                            }}
+                            className="text-[10px] font-bold text-[#FF1493] uppercase tracking-widest float-right"
+                          >
+                            保存修改
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-neutral-700 leading-relaxed italic">
+                          {selectedDay.note ? `"${selectedDay.note}"` : "今天没有留下文字，但努力已经刻在心里 ✨"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setSelectedDay(null)}
+                    className="w-full py-5 bg-neutral-900 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-transform"
+                  >
+                    太棒了，继续加油
+                  </button>
                 </motion.div>
               </motion.div>
             )}
@@ -595,7 +639,10 @@ export default function App() {
                 {MOODS.map(m => (
                   <button
                     key={m.label}
-                    onClick={() => saveSession(m)}
+                    onClick={() => {
+                      const note = (document.getElementById('session-note') as HTMLTextAreaElement)?.value;
+                      saveSession(m, note);
+                    }}
                     className="aspect-square rounded-3xl bg-neutral-50 flex flex-col items-center justify-center gap-2 hover:bg-neutral-100 transition-colors active:scale-95"
                   >
                     <span className="text-3xl">{m.emoji}</span>
