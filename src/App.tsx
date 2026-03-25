@@ -36,7 +36,16 @@ const COLORS = [
   '#F3D1F4', '#D1E8E2', '#F9D5E5', '#E3E2B4', '#A8E6CF'
 ];
 
-const getRandomColor = () => COLORS[Math.floor(Math.random() * COLORS.length)];
+const COLOR_THEMES = {
+  warm: ['#FFB7B2', '#FFDAC1', '#F9D5E5', '#FFD1DC', '#FFE4E1'],
+  cool: ['#C7CEEA', '#B5EAD7', '#D1E8E2', '#E0F7FA', '#E1F5FE'],
+  nature: ['#E2F0CB', '#B5EAD7', '#A8E6CF', '#DCEDC1', '#F1F8E9'],
+  dark: ['#2C3E50', '#34495E', '#212121', '#37474F', '#455A64'],
+};
+
+const NEUTRAL_COLORS = ['#000000', '#333333', '#666666', '#999999'];
+
+const getRandomColor = (palette: string[]) => palette[Math.floor(Math.random() * palette.length)];
 
 // --- Components ---
 
@@ -47,6 +56,13 @@ export default function App() {
     currentBankId: 'gaokao',
     noRepeat: true,
     displayDuration: 3,
+    volume: 1,
+    brightness: 100,
+    wordColorMode: 'auto',
+    wordFixedColor: '#000000',
+    bgColorMode: 'auto',
+    bgFixedColor: '#FFFFFF',
+    bgTheme: 'warm',
   });
   const [history, setHistory] = useState<string[]>([]); // Used for no-repeat logic
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
@@ -85,6 +101,7 @@ export default function App() {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
+    utterance.volume = settings.volume;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -106,7 +123,16 @@ export default function App() {
 
     const word = availableWords[Math.floor(Math.random() * availableWords.length)];
     setCurrentWord(word);
-    setBgColor(getRandomColor());
+    
+    // Set Background Color
+    if (settings.bgColorMode === 'auto') {
+      setBgColor(getRandomColor(COLORS));
+    } else if (settings.bgColorMode === 'fixed') {
+      setBgColor(settings.bgFixedColor);
+    } else if (settings.bgColorMode === 'theme') {
+      setBgColor(getRandomColor(COLOR_THEMES[settings.bgTheme]));
+    }
+
     if (settings.noRepeat) {
       setHistory(prev => [...prev, word.word]);
     }
@@ -162,6 +188,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans text-neutral-900 overflow-hidden flex flex-col max-w-md mx-auto shadow-2xl relative">
+      {/* Brightness Overlay */}
+      <div 
+        className="fixed inset-0 pointer-events-none z-[9999] bg-black" 
+        style={{ opacity: (100 - settings.brightness) / 100 * 0.8 }}
+      />
       <AnimatePresence mode="wait">
         {view === 'home' && (
           <motion.div 
@@ -229,6 +260,13 @@ export default function App() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 className="text-5xl font-bold tracking-tight"
+                style={{ 
+                  color: settings.wordColorMode === 'fixed' 
+                    ? settings.wordFixedColor 
+                    : settings.wordColorMode === 'neutral'
+                    ? getRandomColor(NEUTRAL_COLORS)
+                    : undefined 
+                }}
               >
                 {currentWord.word}
               </motion.h2>
@@ -278,15 +316,139 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
-              <section>
-                <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">显示时长 (秒)</h3>
-                <input 
-                  type="range" min="3" max="30" 
-                  value={settings.displayDuration}
-                  onChange={(e) => setSettings(s => ({ ...s, displayDuration: parseInt(e.target.value) }))}
-                  className="w-full accent-[#FF1493]"
-                />
-                <div className="text-center mt-2 font-mono">{settings.displayDuration}s</div>
+              <section className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">显示时长 (秒)</h3>
+                  <input 
+                    type="range" min="3" max="30" 
+                    value={settings.displayDuration}
+                    onChange={(e) => setSettings(s => ({ ...s, displayDuration: parseInt(e.target.value) }))}
+                    className="w-full accent-[#FF1493]"
+                  />
+                  <div className="text-center mt-2 font-mono">{settings.displayDuration}s</div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest">朗读音量</h3>
+                    <span className="text-xs font-mono">{Math.round(settings.volume * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max="1" step="0.1" 
+                    value={settings.volume}
+                    onChange={(e) => setSettings(s => ({ ...s, volume: parseFloat(e.target.value) }))}
+                    className="w-full accent-[#FF1493]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest">模拟亮度</h3>
+                    <span className="text-xs font-mono">{settings.brightness}%</span>
+                  </div>
+                  <input 
+                    type="range" min="20" max="100" step="5" 
+                    value={settings.brightness}
+                    onChange={(e) => setSettings(s => ({ ...s, brightness: parseInt(e.target.value) }))}
+                    className="w-full accent-[#FF1493]"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">单词显示颜色</h3>
+                  <div className="flex gap-2 mb-4">
+                    {[
+                      { id: 'auto', label: '随机多巴胺' },
+                      { id: 'neutral', label: '黑白灰' },
+                      { id: 'fixed', label: '固定色' }
+                    ].map(mode => (
+                      <button 
+                        key={mode.id}
+                        onClick={() => setSettings(s => ({ ...s, wordColorMode: mode.id as any }))}
+                        className={`flex-1 py-3 rounded-xl font-bold text-[10px] transition-all ${settings.wordColorMode === mode.id ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {settings.wordColorMode === 'fixed' && (
+                    <div className="flex justify-between px-2">
+                      {[
+                        { name: '黑', color: '#000000' },
+                        { name: '深灰', color: '#333333' },
+                        { name: '中灰', color: '#666666' },
+                        { name: '浅灰', color: '#999999' },
+                        { name: '粉', color: '#FF1493' }
+                      ].map(c => (
+                        <button
+                          key={c.color}
+                          onClick={() => setSettings(s => ({ ...s, wordFixedColor: c.color }))}
+                          className={`w-8 h-8 rounded-full border-4 transition-transform ${settings.wordFixedColor === c.color ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
+                          style={{ backgroundColor: c.color }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-4">背景显示模式</h3>
+                  <div className="flex gap-2 mb-4">
+                    {[
+                      { id: 'auto', label: '随机多巴胺' },
+                      { id: 'theme', label: '特定色系' },
+                      { id: 'fixed', label: '固定纯色' }
+                    ].map(mode => (
+                      <button 
+                        key={mode.id}
+                        onClick={() => setSettings(s => ({ ...s, bgColorMode: mode.id as any }))}
+                        className={`flex-1 py-3 rounded-xl font-bold text-[10px] transition-all ${settings.bgColorMode === mode.id ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {settings.bgColorMode === 'theme' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'warm', label: '暖色调', color: '#FFB7B2' },
+                        { id: 'cool', label: '冷色调', color: '#C7CEEA' },
+                        { id: 'nature', label: '自然色', color: '#E2F0CB' },
+                        { id: 'dark', label: '深色调', color: '#2C3E50' }
+                      ].map(theme => (
+                        <button
+                          key={theme.id}
+                          onClick={() => setSettings(s => ({ ...s, bgTheme: theme.id as any }))}
+                          className={`py-2 rounded-lg border-2 flex items-center justify-center gap-2 transition-all ${settings.bgTheme === theme.id ? 'border-neutral-900 bg-neutral-50' : 'border-transparent bg-neutral-100'}`}
+                        >
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: theme.color }} />
+                          <span className="text-xs font-medium">{theme.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {settings.bgColorMode === 'fixed' && (
+                    <div className="flex justify-between px-2">
+                      {[
+                        { name: '白', color: '#FFFFFF' },
+                        { name: '米', color: '#FDFCF8' },
+                        { name: '灰', color: '#F5F5F5' },
+                        { name: '粉', color: '#FFF0F5' },
+                        { name: '蓝', color: '#F0F8FF' }
+                      ].map(c => (
+                        <button
+                          key={c.color}
+                          onClick={() => setSettings(s => ({ ...s, bgFixedColor: c.color }))}
+                          className={`w-8 h-8 rounded-full border-4 transition-transform ${settings.bgFixedColor === c.color ? 'scale-110 border-neutral-900' : 'border-transparent'}`}
+                          style={{ backgroundColor: c.color }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </section>
 
               <section>
