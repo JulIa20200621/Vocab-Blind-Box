@@ -452,6 +452,7 @@ function AddCustomBank({ onAdd }: { onAdd: (bank: WordBank) => void }) {
   const [name, setName] = useState('');
   const [rawWords, setRawWords] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [useAi, setUseAi] = useState(true);
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -470,37 +471,58 @@ function AddCustomBank({ onAdd }: { onAdd: (bank: WordBank) => void }) {
         fullText += pageText + '\n';
       }
 
-      // Use Gemini to extract words from text
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `从以下文本中提取出重要的英语生词，并为每个单词提供词性(pos)和中文释义(meaning)。
-        文本内容: ${fullText.substring(0, 10000)} // Limit text length
-        
-        请以JSON数组格式返回，每个对象包含: word, pos, meaning。`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                word: { type: Type.STRING },
-                pos: { type: Type.STRING },
-                meaning: { type: Type.STRING }
-              },
-              required: ["word", "pos", "meaning"]
+      if (useAi) {
+        // Use Gemini to extract words from text
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: `从以下文本中提取出重要的英语生词，并为每个单词提供词性(pos)和中文释义(meaning)。
+          文本内容: ${fullText.substring(0, 10000)}
+          
+          请以JSON数组格式返回，每个对象包含: word, pos, meaning。`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  word: { type: Type.STRING },
+                  pos: { type: Type.STRING },
+                  meaning: { type: Type.STRING }
+                },
+                required: ["word", "pos", "meaning"]
+              }
             }
           }
-        }
-      });
+        });
 
-      const extractedWords = JSON.parse(response.text);
-      if (Array.isArray(extractedWords)) {
-        const formatted = extractedWords.map(w => `${w.word} ${w.pos} ${w.meaning}`).join('\n');
-        setRawWords(prev => prev ? prev + '\n' + formatted : formatted);
-        if (!name) setName(file.name.replace('.pdf', ''));
+        const extractedWords = JSON.parse(response.text);
+        if (Array.isArray(extractedWords)) {
+          const formatted = extractedWords.map(w => `${w.word} ${w.pos} ${w.meaning}`).join('\n');
+          setRawWords(prev => prev ? prev + '\n' + formatted : formatted);
+        }
+      } else {
+        // Simple extraction: Match English words and Chinese on the same line
+        const lines = fullText.split('\n');
+        const extracted: string[] = [];
+        
+        lines.forEach(line => {
+          const engMatch = line.match(/[a-zA-Z]{3,}/);
+          const chiMatch = line.match(/[\u4e00-\u9fa5]+/);
+          
+          if (engMatch) {
+            const word = engMatch[0].toLowerCase();
+            const meaning = chiMatch ? chiMatch[0] : '[待补全]';
+            extracted.push(`${word} n. ${meaning}`);
+          }
+        });
+
+        const unique = Array.from(new Set(extracted)).slice(0, 100);
+        setRawWords(prev => prev ? prev + '\n' + unique.join('\n') : unique.join('\n'));
       }
+      
+      if (!name) setName(file.name.replace('.pdf', ''));
     } catch (error) {
       console.error('PDF processing error:', error);
       alert('PDF解析失败，请尝试手动输入或检查网络。');
@@ -562,7 +584,21 @@ function AddCustomBank({ onAdd }: { onAdd: (bank: WordBank) => void }) {
               
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                  <p className="text-xs text-blue-700 font-bold mb-2 uppercase tracking-wider">✨ AI 智能解析 (PDF)</p>
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-xs text-blue-700 font-bold uppercase tracking-wider">✨ PDF 单词提取</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-blue-600">AI 翻译</span>
+                      <button 
+                        onClick={() => setUseAi(!useAi)}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${useAi ? 'bg-blue-500' : 'bg-neutral-300'}`}
+                      >
+                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${useAi ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-blue-400 mb-3 leading-tight">
+                    {useAi ? "AI 模式：自动识别生词并翻译（最智能，需联网）" : "极简模式：提取单词及同行中文（无需联网，保护隐私）"}
+                  </p>
                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                       {isProcessing ? (
