@@ -20,6 +20,12 @@ import {
 import { Word, WordBank, AppSettings } from './types';
 import { DEFAULT_BANKS } from './data/defaultWords';
 
+import { GoogleGenAI, Type } from "@google/genai";
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 // --- Constants & Helpers ---
 const STORAGE_KEY_BANKS = 'word_blind_box_custom_banks';
 const STORAGE_KEY_SETTINGS = 'word_blind_box_settings';
@@ -75,6 +81,8 @@ export default function App() {
   const currentBank = allBanks.find(b => b.id === settings.currentBankId) || DEFAULT_BANKS[0];
 
   const speak = (text: string) => {
+    // Cancel any ongoing speech to prevent mismatch when switching fast
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     window.speechSynthesis.speak(utterance);
@@ -443,6 +451,63 @@ function AddCustomBank({ onAdd }: { onAdd: (bank: WordBank) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState('');
   const [rawWords, setRawWords] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+
+      // Use Gemini to extract words from text
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `从以下文本中提取出重要的英语生词，并为每个单词提供词性(pos)和中文释义(meaning)。
+        文本内容: ${fullText.substring(0, 10000)} // Limit text length
+        
+        请以JSON数组格式返回，每个对象包含: word, pos, meaning。`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                word: { type: Type.STRING },
+                pos: { type: Type.STRING },
+                meaning: { type: Type.STRING }
+              },
+              required: ["word", "pos", "meaning"]
+            }
+          }
+        }
+      });
+
+      const extractedWords = JSON.parse(response.text);
+      if (Array.isArray(extractedWords)) {
+        const formatted = extractedWords.map(w => `${w.word} ${w.pos} ${w.meaning}`).join('\n');
+        setRawWords(prev => prev ? prev + '\n' + formatted : formatted);
+        if (!name) setName(file.name.replace('.pdf', ''));
+      }
+    } catch (error) {
+      console.error('PDF processing error:', error);
+      alert('PDF解析失败，请尝试手动输入或检查网络。');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleAdd = () => {
     if (!name || !rawWords) return;
@@ -495,20 +560,39 @@ function AddCustomBank({ onAdd }: { onAdd: (bank: WordBank) => void }) {
                 <button onClick={() => setIsOpen(false)}><X /></button>
               </div>
               
-              <input 
-                placeholder="词库名称 (如: 我的生词本)"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className="w-full p-4 bg-neutral-100 rounded-xl outline-none focus:ring-2 ring-[#FF1493]"
-              />
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                  <p className="text-xs text-blue-700 font-bold mb-2 uppercase tracking-wider">✨ AI 智能解析 (PDF)</p>
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      {isProcessing ? (
+                        <RefreshCw className="animate-spin text-blue-500" />
+                      ) : (
+                        <>
+                          <Plus className="text-blue-500 mb-1" />
+                          <p className="text-xs text-blue-600">点击上传 PDF 自动提取单词</p>
+                        </>
+                      )}
+                    </div>
+                    <input type="file" accept=".pdf" className="hidden" onChange={handlePdfUpload} disabled={isProcessing} />
+                  </label>
+                </div>
 
-              <textarea 
-                placeholder="输入单词，格式: 单词 词性 意思 (每行一个)&#10;例如: apple n. 苹果"
-                rows={6}
-                value={rawWords}
-                onChange={e => setRawWords(e.target.value)}
-                className="w-full p-4 bg-neutral-100 rounded-xl outline-none focus:ring-2 ring-[#FF1493] resize-none"
-              />
+                <input 
+                  placeholder="词库名称 (如: 我的生词本)"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full p-4 bg-neutral-100 rounded-xl outline-none focus:ring-2 ring-[#FF1493]"
+                />
+
+                <textarea 
+                  placeholder="输入单词，格式: 单词 词性 意思 (每行一个)&#10;例如: apple n. 苹果"
+                  rows={6}
+                  value={rawWords}
+                  onChange={e => setRawWords(e.target.value)}
+                  className="w-full p-4 bg-neutral-100 rounded-xl outline-none focus:ring-2 ring-[#FF1493] resize-none"
+                />
+              </div>
 
               <button 
                 onClick={handleAdd}
