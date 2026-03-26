@@ -25,6 +25,9 @@ export interface AppSettings {
   bgTheme: 'warm' | 'cool' | 'nature' | 'dark';
   bgCustomColors: string[]; // max 5
   dailyGoal: number | 'mood'; // number or 'mood' for "as I feel"
+  readWord: boolean;
+  readMeaning: boolean;
+  readPos: boolean;
 }
 
 export interface DailyProgress {
@@ -34,6 +37,7 @@ export interface DailyProgress {
   mood?: string; // emoji or label
   moodColor?: string;
   note?: string;
+  completedBank?: boolean;
 }
 
 export interface UserProfile {

@@ -82,63 +82,152 @@ const MOODS = [
   { emoji: '😤', label: '奋斗', color: '#F44336' },
 ];
 
+const POS_MAP: Record<string, string> = {
+  'n.': 'noun',
+  'v.': 'verb',
+  'adj.': 'adjective',
+  'adv.': 'adverb',
+  'prep.': 'preposition',
+  'conj.': 'conjunction',
+  'pron.': 'pronoun',
+  'int.': 'interjection',
+  'num.': 'numeral',
+  'art.': 'article',
+  'n': 'noun',
+  'v': 'verb',
+  'adj': 'adjective',
+  'adv': 'adverb'
+};
+
 const getRandomColor = (palette: string[]) => palette[Math.floor(Math.random() * palette.length)];
 
 // --- Components ---
 
-const Calendar = ({ progress, onDayClick }: { progress: DailyProgress[], onDayClick: (day: DailyProgress) => void }) => {
-  const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
-  
-  const days = Array.from({ length: daysInMonth }, (_, i) => {
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
-    return progress.find(p => p.date === dateStr) || { date: dateStr, wordCount: 0, timeSpent: 0 };
-  });
+  const Calendar = ({ progress, onDayClick }: { progress: DailyProgress[], onDayClick: (day: DailyProgress) => void }) => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+    
+    const days = Array.from({ length: daysInMonth }, (_, i) => {
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+      return progress.find(p => p.date === dateStr) || { date: dateStr, wordCount: 0, timeSpent: 0 };
+    });
 
-  return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-100">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-lg">{now.getFullYear()}年{now.getMonth() + 1}月</h3>
-        <div className="flex gap-2">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-sm bg-neutral-100 border border-neutral-900"></div>
-            <span className="text-[10px] text-neutral-400">未打卡</span>
+    return (
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-100">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-lg">{now.getFullYear()}年{now.getMonth() + 1}月</h3>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-sm bg-neutral-100 border border-neutral-900"></div>
+              <span className="text-[10px] text-neutral-400">未打卡</span>
+            </div>
           </div>
         </div>
+        <div className="grid grid-cols-7 gap-2">
+          {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+            <div key={d} className="text-center text-[10px] font-bold text-neutral-300 py-1">{d}</div>
+          ))}
+          {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
+          {days.map(day => {
+            const hasData = day.wordCount > 0;
+            const isCompleted = (day as DailyProgress).completedBank;
+            return (
+              <button
+                key={day.date}
+                onClick={() => onDayClick(day as DailyProgress)}
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative ${
+                  hasData 
+                    ? 'ring-2 ring-offset-1 ring-neutral-100' 
+                    : 'bg-neutral-100 border border-neutral-300'
+                }`}
+                style={{ backgroundColor: (day as DailyProgress).moodColor || 'transparent' }}
+              >
+                {isCompleted && (
+                  <div className="absolute -top-1 -left-1 bg-yellow-400 rounded-full p-0.5 shadow-sm z-10">
+                    <span className="text-[8px]">🏆</span>
+                  </div>
+                )}
+                <span className={`text-[10px] font-bold ${hasData ? 'text-white drop-shadow-sm' : 'text-neutral-400'}`}>
+                  {parseInt(day.date.split('-')[2])}
+                </span>
+                {hasData && (day as DailyProgress).mood && (
+                  <span className="text-xs">{(day as DailyProgress).mood}</span>
+                )}
+                {!hasData && (
+                  <div className="absolute inset-0 border border-black/20 rounded-xl pointer-events-none"></div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <div className="grid grid-cols-7 gap-2">
-        {['日', '一', '二', '三', '四', '五', '六'].map(d => (
-          <div key={d} className="text-center text-[10px] font-bold text-neutral-300 py-1">{d}</div>
+    );
+  };
+
+const CompletionView = ({ bankName, wordCount, onFinish }: { bankName: string, wordCount: number, onFinish: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onFinish();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [onFinish]);
+
+  return (
+    <motion.div 
+      key="completion"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex-1 flex flex-col items-center justify-center p-8 bg-[#FF1493] text-white text-center relative overflow-hidden"
+    >
+      {/* Confetti/Ribbon Effect */}
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: 30 }).map((_, i) => (
+          <motion.div
+            key={i}
+            initial={{ 
+              y: -20, 
+              x: Math.random() * 400, 
+              rotate: 0,
+              scale: 0.5 + Math.random()
+            }}
+            animate={{ 
+              y: 800, 
+              rotate: 360 + Math.random() * 360,
+              x: (Math.random() * 400) + (Math.random() - 0.5) * 100
+            }}
+            transition={{ 
+              duration: 2 + Math.random() * 3, 
+              repeat: Infinity, 
+              ease: "linear",
+              delay: Math.random() * 2
+            }}
+            className="absolute w-2 h-6 rounded-full"
+            style={{ backgroundColor: COLORS[i % COLORS.length] }}
+          />
         ))}
-        {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
-        {days.map(day => {
-          const hasData = day.wordCount > 0;
-          return (
-            <button
-              key={day.date}
-              onClick={() => onDayClick(day as DailyProgress)}
-              className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative ${
-                hasData 
-                  ? 'ring-2 ring-offset-1 ring-neutral-100' 
-                  : 'bg-neutral-100 border border-neutral-300'
-              }`}
-              style={{ backgroundColor: (day as DailyProgress).moodColor || 'transparent' }}
-            >
-              <span className={`text-[10px] font-bold ${hasData ? 'text-white drop-shadow-sm' : 'text-neutral-400'}`}>
-                {parseInt(day.date.split('-')[2])}
-              </span>
-              {hasData && (day as DailyProgress).mood && (
-                <span className="text-xs">{(day as DailyProgress).mood}</span>
-              )}
-              {!hasData && (
-                <div className="absolute inset-0 border border-black/20 rounded-xl pointer-events-none"></div>
-              )}
-            </button>
-          );
-        })}
       </div>
-    </div>
+
+      <motion.div
+        initial={{ scale: 0.5, rotate: -10 }}
+        animate={{ scale: 1.1, rotate: [0, -5, 5, 0] }}
+        transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
+        className="text-8xl mb-8 relative z-10"
+      >
+        🏆
+      </motion.div>
+      <h2 className="text-3xl font-black mb-4 relative z-10">恭喜你！</h2>
+      <p className="text-lg opacity-90 mb-8 relative z-10">
+        你已经成功学完了 <span className="font-black underline">{bankName}</span> 的所有词汇！
+      </p>
+      <div className="bg-white/20 backdrop-blur-md p-6 rounded-3xl mb-8 w-full relative z-10">
+        <div className="text-sm opacity-80 mb-1">总计背诵</div>
+        <div className="text-4xl font-black">{wordCount} 词</div>
+      </div>
+      <p className="text-sm opacity-60 animate-pulse relative z-10">
+        5秒后自动进入心情记录...
+      </p>
+    </motion.div>
   );
 };
 
@@ -159,12 +248,16 @@ export default function App() {
     bgTheme: 'warm',
     bgCustomColors: [],
     dailyGoal: 'mood',
+    readWord: true,
+    readMeaning: false,
+    readPos: true,
   });
   const [history, setHistory] = useState<string[]>([]); // Used for no-repeat logic
   const [progress, setProgress] = useState<DailyProgress[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
   
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
+  const [wordDisplayTime, setWordDisplayTime] = useState<number>(0);
   const [bgColor, setBgColor] = useState('#FFFFFF');
   const [wordColor, setWordColor] = useState('#000000');
   
@@ -219,26 +312,48 @@ export default function App() {
   const allBanks = [...DEFAULT_BANKS, ...customBanks];
   const currentBank = allBanks.find(b => b.id === settings.currentBankId) || DEFAULT_BANKS[0];
 
-  const speak = (text: string) => {
+  const speak = (word: string, pos: string, meaning: string) => {
     try {
       window.speechSynthesis.cancel();
       
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      
-      // Select a high-quality voice if available (especially for macOS/iOS)
       const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(v => 
-        (v.name.includes('Samantha') || v.name.includes('Alex') || v.name.includes('Google US English')) && v.lang.startsWith('en')
-      ) || voices.find(v => v.lang.startsWith('en'));
       
-      if (preferredVoice) utterance.voice = preferredVoice;
+      // Part 1: English (Word and POS)
+      let englishText = '';
+      if (settings.readWord) englishText += `${word}. `;
+      if (settings.readPos) {
+        const cleanPos = pos.toLowerCase().trim();
+        const fullPos = POS_MAP[cleanPos] || cleanPos;
+        englishText += `${fullPos}. `;
+      }
       
-      const vol = typeof settings.volume === 'number' ? settings.volume : 1;
-      utterance.volume = Math.max(0, Math.min(1, vol));
-      utterance.rate = 0.9; // Slightly slower for clarity
+      if (englishText) {
+        const englishUtterance = new SpeechSynthesisUtterance(englishText);
+        englishUtterance.lang = 'en-US';
+        const preferredEnglishVoice = voices.find(v => 
+          (v.name.includes('Samantha') || v.name.includes('Alex') || v.name.includes('Google US English')) && v.lang.startsWith('en')
+        ) || voices.find(v => v.lang.startsWith('en'));
+        
+        if (preferredEnglishVoice) englishUtterance.voice = preferredEnglishVoice;
+        englishUtterance.volume = Math.max(0, Math.min(1, settings.volume));
+        englishUtterance.rate = 0.9;
+        window.speechSynthesis.speak(englishUtterance);
+      }
       
-      window.speechSynthesis.speak(utterance);
+      // Part 2: Chinese (Meaning)
+      if (settings.readMeaning && meaning) {
+        const chineseUtterance = new SpeechSynthesisUtterance(meaning);
+        chineseUtterance.lang = 'zh-CN';
+        // Find a Chinese voice to avoid "American accent Chinese"
+        const preferredChineseVoice = voices.find(v => 
+          (v.name.includes('Tingting') || v.name.includes('Li-Mu') || v.name.includes('Google 普通话') || v.name.includes('Kangkang')) && v.lang.startsWith('zh')
+        ) || voices.find(v => v.lang.startsWith('zh'));
+        
+        if (preferredChineseVoice) chineseUtterance.voice = preferredChineseVoice;
+        chineseUtterance.volume = Math.max(0, Math.min(1, settings.volume));
+        chineseUtterance.rate = 1.0;
+        window.speechSynthesis.speak(chineseUtterance);
+      }
     } catch (e) {
       console.error('Speech synthesis error:', e);
     }
@@ -249,6 +364,14 @@ export default function App() {
     
     // Check if all words in bank are finished
     if (settings.noRepeat && history.length >= currentBank.words.length) {
+      const today = new Date().toISOString().split('T')[0];
+      setProgress(prev => {
+        const existing = prev.find(p => p.date === today);
+        if (existing) {
+          return prev.map(p => p.date === today ? { ...p, completedBank: true } : p);
+        }
+        return [...prev, { date: today, wordCount: 0, timeSpent: 0, completedBank: true }];
+      });
       setView('completion');
       return;
     }
@@ -259,6 +382,14 @@ export default function App() {
 
     if (availableWords.length === 0) {
       if (settings.noRepeat) {
+        const today = new Date().toISOString().split('T')[0];
+        setProgress(prev => {
+          const existing = prev.find(p => p.date === today);
+          if (existing) {
+            return prev.map(p => p.date === today ? { ...p, completedBank: true } : p);
+          }
+          return [...prev, { date: today, wordCount: 0, timeSpent: 0, completedBank: true }];
+        });
         setView('completion');
         return;
       } else {
@@ -274,6 +405,7 @@ export default function App() {
 
     const word = availableWords[Math.floor(Math.random() * availableWords.length)];
     setCurrentWord(word);
+    setWordDisplayTime(Date.now());
     setSessionWordCount(prev => prev + 1);
     
     // Set Word Color
@@ -305,8 +437,16 @@ export default function App() {
     }
     
     // Speak
-    speak(`${word.word}. ${word.pos}. ${word.meaning}`);
-  }, [currentBank, settings, history]);
+    if (word) {
+      speak(word.word, word.pos, word.meaning);
+    }
+  }, [currentBank, settings, history, sessionWordCount]);
+
+  const speakCurrent = useCallback(() => {
+    if (currentWord) {
+      speak(currentWord.word, currentWord.pos, currentWord.meaning);
+    }
+  }, [currentWord, settings]);
 
   const handleStart = async () => {
     // Request Shake Permission for iOS
@@ -386,7 +526,9 @@ export default function App() {
         const deltaZ = Math.abs(lastZ - z);
 
         if ((deltaX > threshold && deltaY > threshold) || (deltaX > threshold && deltaZ > threshold) || (deltaY > threshold && deltaZ > threshold)) {
-          pickRandomWord();
+          if (Date.now() - wordDisplayTime >= 3000) {
+            pickRandomWord();
+          }
         }
       }
 
@@ -417,6 +559,22 @@ export default function App() {
             exit={{ opacity: 0, y: -20 }}
             className="flex-1 flex flex-col p-6 overflow-y-auto"
           >
+            {/* Ribbon Background Effect if completed today */}
+            {progress.find(p => p.date === new Date().toISOString().split('T')[0])?.completedBank && (
+              <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-20">
+                {Array.from({ length: 15 }).map((_, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ y: -20, x: Math.random() * 400, rotate: 0 }}
+                    animate={{ y: 800, rotate: 360 }}
+                    transition={{ duration: 3 + Math.random() * 2, repeat: Infinity, ease: "linear", delay: Math.random() * 5 }}
+                    className="absolute w-2 h-8 bg-[#FF1493] rounded-full"
+                    style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                  />
+                ))}
+              </div>
+            )}
+
             <div className="flex justify-between items-center mb-8">
               <div className="flex flex-col">
                 <h1 className="text-2xl font-bold tracking-tight">单词盲盒</h1>
@@ -427,13 +585,78 @@ export default function App() {
               </button>
             </div>
 
-            <button 
-              onClick={handleStart}
-              className="w-full aspect-square rounded-3xl bg-[#FF1493] text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform mb-8 shrink-0"
-            >
-              <span className="text-4xl font-black mb-2">START</span>
-              <span className="text-sm opacity-80">开启今日盲盒</span>
-            </button>
+            <div className="relative mb-8 shrink-0">
+              <button 
+                onClick={handleStart}
+                className={`w-full aspect-square rounded-3xl bg-[#FF1493] text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform relative overflow-hidden ${
+                  progress.find(p => p.date === new Date().toISOString().split('T')[0])?.completedBank ? 'ring-4 ring-yellow-400 ring-offset-4' : ''
+                }`}
+              >
+                <span className="text-4xl font-black mb-2">START</span>
+                <span className="text-sm opacity-80">开启今日盲盒</span>
+                
+                {/* Trophy in START button */}
+                {progress.find(p => p.date === new Date().toISOString().split('T')[0])?.completedBank && (
+                  <div className="absolute bottom-4 right-4 bg-yellow-400 text-white p-2 rounded-2xl shadow-lg animate-bounce">
+                    <span className="text-2xl">🏆</span>
+                  </div>
+                )}
+
+                {/* Curvy Ribbon decorations on button borders */}
+                {progress.find(p => p.date === new Date().toISOString().split('T')[0])?.completedBank && (
+                  <>
+                    {/* Bottom Edge - Curvy */}
+                    <div className="absolute bottom-1 left-0 w-full h-4 pointer-events-none">
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <motion.div
+                          key={`bot-${i}`}
+                          animate={{ 
+                            y: [0, -4, 0],
+                            rotate: [i % 2 === 0 ? 15 : -15, i % 2 === 0 ? -15 : 15]
+                          }}
+                          transition={{ 
+                            duration: 2 + Math.random(), 
+                            repeat: Infinity, 
+                            ease: "easeInOut",
+                            delay: i * 0.1
+                          }}
+                          className="absolute w-4 h-1.5 rounded-full"
+                          style={{ 
+                            backgroundColor: COLORS[i % COLORS.length],
+                            left: `${(i * 8) + 4}%`,
+                            bottom: '0px'
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {/* Right Edge - Curvy */}
+                    <div className="absolute top-0 right-1 h-full w-4 pointer-events-none">
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <motion.div
+                          key={`right-${i}`}
+                          animate={{ 
+                            x: [0, -4, 0],
+                            rotate: [i % 2 === 0 ? 75 : 105, i % 2 === 0 ? 105 : 75]
+                          }}
+                          transition={{ 
+                            duration: 2 + Math.random(), 
+                            repeat: Infinity, 
+                            ease: "easeInOut",
+                            delay: i * 0.1
+                          }}
+                          className="absolute w-4 h-1.5 rounded-full"
+                          style={{ 
+                            backgroundColor: COLORS[i % COLORS.length],
+                            top: `${(i * 8) + 4}%`,
+                            right: '0px'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </button>
+            </div>
 
             <div className="space-y-6 mb-8">
               <div className="p-4 bg-white rounded-2xl border border-neutral-200 shadow-sm">
@@ -484,14 +707,44 @@ export default function App() {
                   {/* Background Decoration */}
                   <div className="absolute top-0 left-0 w-full h-24 opacity-10" style={{ backgroundColor: selectedDay.moodColor || '#FF1493' }}></div>
                   
-                  <button onClick={() => setSelectedDay(null)} className="absolute top-6 right-6 p-2 bg-neutral-100 rounded-full text-neutral-400 hover:text-neutral-900 transition-colors">
+                  {/* Ribbon Background Effect if bank completed */}
+                  {selectedDay.completedBank && (
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-10">
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <motion.div
+                          key={`report-ribbon-${i}`}
+                          initial={{ y: -20, x: Math.random() * 350, rotate: 0 }}
+                          animate={{ y: 600, rotate: 360 }}
+                          transition={{ duration: 4 + Math.random() * 2, repeat: Infinity, ease: "linear", delay: Math.random() * 2 }}
+                          className="absolute w-1.5 h-6 rounded-full"
+                          style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  <button onClick={() => setSelectedDay(null)} className="absolute top-6 right-6 p-2 bg-neutral-100 rounded-full text-neutral-400 hover:text-neutral-900 transition-colors z-20">
                     <X size={20} />
                   </button>
 
-                  <div className="text-center relative pt-4">
-                    <div className="text-6xl mb-4 drop-shadow-lg">{selectedDay.mood || '📝'}</div>
+                  <div className="text-center relative pt-4 z-10">
+                    <div className="text-6xl mb-4 drop-shadow-lg relative inline-block">
+                      {selectedDay.mood || '📝'}
+                      {selectedDay.completedBank && (
+                        <div className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-1 shadow-md animate-bounce">
+                          <span className="text-sm">🏆</span>
+                        </div>
+                      )}
+                    </div>
                     <h3 className="text-2xl font-black tracking-tight">{selectedDay.date}</h3>
-                    <p className="text-sm font-bold text-neutral-400 uppercase tracking-widest mt-1">学习成就报告</p>
+                    <div className="flex flex-col items-center mt-1">
+                      <p className="text-sm font-bold text-neutral-400 uppercase tracking-widest">学习成就报告</p>
+                      {selectedDay.completedBank && (
+                        <span className="mt-2 px-3 py-1 bg-yellow-100 text-yellow-700 text-[10px] font-black rounded-full flex items-center gap-1 border border-yellow-200">
+                          🏆 成功背完单词表
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -585,7 +838,7 @@ export default function App() {
 
             <div className="absolute top-8 right-8 flex gap-2">
               <button 
-                onClick={() => speak(`${currentWord.word}. ${currentWord.pos}. ${currentWord.meaning}`)} 
+                onClick={speakCurrent} 
                 className="p-3 bg-white/20 backdrop-blur-md rounded-full text-neutral-900"
               >
                 <Volume2 size={24} />
@@ -697,37 +950,14 @@ export default function App() {
         )}
 
         {view === 'completion' && (
-          <motion.div 
-            key="completion"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex-1 flex flex-col items-center justify-center p-8 bg-[#FF1493] text-white text-center"
-          >
-            <motion.div
-              initial={{ scale: 0.5, rotate: -10 }}
-              animate={{ scale: 1, rotate: 0 }}
-              className="text-8xl mb-8"
-            >
-              🏆
-            </motion.div>
-            <h2 className="text-3xl font-black mb-4">恭喜你！</h2>
-            <p className="text-lg opacity-90 mb-8">
-              你已经成功学完了 <span className="font-black underline">{currentBank.name}</span> 的所有词汇！
-            </p>
-            <div className="bg-white/20 backdrop-blur-md p-6 rounded-3xl mb-8 w-full">
-              <div className="text-sm opacity-80 mb-1">总计背诵</div>
-              <div className="text-4xl font-black">{currentBank.words.length} 词</div>
-            </div>
-            <button 
-              onClick={() => {
-                setHistory([]);
-                setView('home');
-              }}
-              className="w-full py-5 bg-white text-[#FF1493] rounded-2xl font-bold shadow-xl active:scale-95 transition-transform"
-            >
-              太棒了，回到首页
-            </button>
-          </motion.div>
+          <CompletionView 
+            bankName={currentBank.name} 
+            wordCount={currentBank.words.length} 
+            onFinish={() => {
+              setHistory([]);
+              handleEndSession();
+            }} 
+          />
         )}
 
         {view === 'settings' && (
@@ -801,6 +1031,27 @@ export default function App() {
                     className="w-full accent-[#FF1493]"
                   />
                   <div className="text-center mt-2 font-mono">{settings.displayDuration}s</div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest">朗读设置</h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'readWord', label: '单词英文' },
+                      { id: 'readPos', label: '词性' },
+                      { id: 'readMeaning', label: '中文意思' }
+                    ].map(opt => (
+                      <button 
+                        key={opt.id}
+                        onClick={() => setSettings(s => ({ ...s, [opt.id]: !s[opt.id as keyof AppSettings] }))}
+                        className={`py-3 rounded-xl font-bold text-[10px] transition-all ${settings[opt.id as keyof AppSettings] ? 'bg-[#FF1493] text-white' : 'bg-neutral-100 text-neutral-500'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
