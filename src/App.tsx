@@ -221,14 +221,22 @@ export default function App() {
 
   const speak = (text: string) => {
     try {
-      // Cancel any ongoing speech
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
-      // Ensure volume is a valid number between 0 and 1
+      
+      // Select a high-quality voice if available (especially for macOS/iOS)
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => 
+        (v.name.includes('Samantha') || v.name.includes('Alex') || v.name.includes('Google US English')) && v.lang.startsWith('en')
+      ) || voices.find(v => v.lang.startsWith('en'));
+      
+      if (preferredVoice) utterance.voice = preferredVoice;
+      
       const vol = typeof settings.volume === 'number' ? settings.volume : 1;
       utterance.volume = Math.max(0, Math.min(1, vol));
+      utterance.rate = 0.9; // Slightly slower for clarity
       
       window.speechSynthesis.speak(utterance);
     } catch (e) {
@@ -300,7 +308,19 @@ export default function App() {
     speak(`${word.word}. ${word.pos}. ${word.meaning}`);
   }, [currentBank, settings, history]);
 
-  const handleStart = () => {
+  const handleStart = async () => {
+    // Request Shake Permission for iOS
+    if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+      try {
+        const permission = await (DeviceMotionEvent as any).requestPermission();
+        if (permission !== 'granted') {
+          console.warn('Shake permission denied');
+        }
+      } catch (e) {
+        console.error('Error requesting shake permission:', e);
+      }
+    }
+
     setSessionStartTime(Date.now());
     setSessionWordCount(0);
     setView('blind-box');
